@@ -7,7 +7,7 @@
 
 ##### Example of analysis
 
-* [Wordscore and visualisations example](files/UNGD analysis RAP code update.nb.html)
+* [Wordscore and visualisations example](files/UNGD_analysis_example.nb.html)
 
 ##### Data publication and replication notebook
 * [Research and Politics _RAP_ article](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821)
