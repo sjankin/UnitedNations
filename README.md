@@ -11,4 +11,4 @@
 
 ##### Data publication and replication notebook
 * [Research and Politics _RAP_ article](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821)
-* [Notebook for _RAP_ article](files/RAP.nb.html)
+* [Replication set for _RAP_ article](https://doi.org/10.7910/DVN/AER5QJ)
