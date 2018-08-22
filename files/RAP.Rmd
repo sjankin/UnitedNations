@@ -1,0 +1,596 @@
+---
+title: "Understanding State Preferences With Text As Data: Introducing the UN General Debate Corpus"
+author:
+- affiliation: Dublin City University
+  email: alex.baturo@dcu.ie
+  name: Alexander Baturo
+- affiliation: University of Birmingham
+  email: n.dasandi@bham.ac.uk
+  name: Niheer Dasandi
+- affiliation: University of Essex
+  email: slava.mikhaylov@gmail.com
+  name: Slava Mikhaylov
+date: 28 January 2017
+output:
+  html_notebook:
+    toc: yes
+  html_document: default
+  pdf_document: default
+  toc: yes
+  word_document: default
+#biblio-style: apsr
+#bibliography: un.bib
+thanks: Authors' names are listed in alphabetical order. Authors have contributed equally to all work.
+abstract: Every year at the United Nations, member states deliver statements during the General Debate discussing major issues in world politics. These speeches provide invaluable information on governments' perspectives and preferences on a wide range of issues, but have largely been overlooked in the study of international politics. This paper introduces a new dataset consisting of over 7,300 country statements from 1970--2014. We demonstrate how the UN General Debate Corpus (UNGDC) can be used to derive country positions on different policy dimensions using text analytic methods. The paper provides applications of these estimates, demonstrating the contribution the UNGDC can make to the study of international politics.
+---
+
+
+##Reading in UNGDC
+
+
+```{r}
+#Loading packages and data
+library(readtext)
+library(quanteda)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(rworldmap)
+library(RColorBrewer)
+library(classInt)
+library(vegan)
+library(boot)
+library(haven)
+library(readxl)
+library(texreg)
+```
+
+
+```{r warning=FALSE}
+
+if (!require("readtext")) devtools::install_github("kbenoit/readtext")
+
+#File path to UNGDC unzipped data archive
+DATA_DIR <- "~/Dropbox/Research/UN Data/" 
+
+#Reading in text files
+ungd_files <- readtext(paste0(DATA_DIR, "Converted sessions/*"), 
+                                 docvarsfrom = "filenames", 
+                                 dvsep="_", 
+                                 docvarnames = c("Country", "Session", "Year"))
+
+if (!require("quanteda")) devtools::install_github("kbenoit/quanteda")
+
+#Creating corpus
+ungd_corpus <- corpus(ungd_files, text_field = "text") 
+
+#Creating corpus for 2014, for Wordscore example below
+ungdc.2014 <- corpus_subset(ungd_corpus, Year==2014)
+
+```
+
+
+##UNGDC corpus summary
+
+```{r}
+
+summarise(group_by(summary(ungd_corpus, n = 7314, verbose = FALSE),Year),
+                           mean(Types),mean(Tokens),
+                           mean(Sentences),min(Sentences),max(Sentences))
+
+```
+
+##Summary of speakers
+
+As discussed in the text we categorize speakers by:
+
+1) heads of state or government (e.g. presidents, prime ministers, kings); 
+2) vice-presidents, deputy prime ministers, and foreign ministers; 
+3) country representative at the UN.
+
+```{r}
+#Reading in Excel spreadsheet with speakers information
+posts <- read_excel("posts_of_speakers.xlsx")
+table <- table(posts$Post)
+table
+```
+
+
+```{r}
+#Proportions by category
+prop.table(table)
+```
+
+
+##Tokenizing documents
+
+```{r}
+#Tokenization and basic pre-processing
+tok <- tokens(ungd_corpus, what = "word",
+              removePunct = TRUE,
+              removeSymbols = TRUE,
+              removeNumbers = TRUE,
+              removeTwitter = TRUE,
+              removeURL = TRUE,
+              removeHyphens = TRUE,
+              verbose = TRUE)
+```
+
+
+##Creating document feature matrix
+
+
+```{r dfm}
+#DFM creation from tokens, removing stopwords, and stemming.
+dfm <- dfm(tok, 
+           tolower = TRUE,
+           remove=stopwords("SMART"),
+           stem=TRUE, 
+           verbose = TRUE)
+
+#Showing 100 most frequrent tokens in DFM
+topfeatures(dfm, n = 100)
+
+```
+
+
+##Removing some features
+
+As part of converting original transcripts held by UN library to digital, machine-readable format, we had to OCR documents before 1994. That introduced several tokens that were compounded with digits, punctuation and other OCR errors. We are cleaning it up here with brute force purging of DFM.
+
+```{r}
+#Removing any digits. `dfm` picks up any separated digits, not digits that are part of tokens.
+dfm.m <- dfm_select(dfm, '[\\d-]',  selection = "remove", 
+                    valuetype="regex", verbose = TRUE)
+
+
+#Removing any punctuation. `dfm` picks up any punctuation unless it's part of a token.
+dfm.m <- dfm_select(dfm.m, "[[:punct:]]",  selection = "remove", 
+                    valuetype="regex", verbose = TRUE)
+
+
+#Removing any tokens less than four characters.
+dfm.m <- dfm_select(dfm.m, '^.{1,3}$',  selection = "remove", 
+                    valuetype="regex", verbose = TRUE)
+
+#100 least frequent terms
+topfeatures(dfm.m, n = 100, decreasing = FALSE)
+```
+
+##Trimming DFM
+
+Some of the least frequent terms above are due to OCR and text digitization errors. In addition, we want to reduce dimensionality of DFM for subsequent computation.
+
+```{r}
+#Dropping words that appear less than 5 times and in less than 3 documents.
+dfm.trim <- dfm_trim(dfm.m, min_count = 5, min_docfreq = 3)
+
+#100 least frequent terms in trimmed DFM
+topfeatures(dfm.trim, n = 100, decreasing = FALSE)
+
+#Level of sparsity of trimmed DFM
+sparsity(dfm.trim)
+
+#Number of features in trimmed DFM
+nfeature(dfm.trim)
+```
+
+
+
+##Wordscore estimates
+
+In the Wordscore example we focus only on subset of the UNGDC corpus (`ungdc.2014`). 
+
+```{r}
+#Reference scores
+refscores <- rep(NA,nrow(dfm.trim))
+
+refscores[str_detect(rownames(dfm.trim), "RUS")] <- -1
+refscores[str_detect(rownames(dfm.trim), "USA")] <- 1
+
+#Wordscore model
+ws <- textmodel_wordscores(dfm.trim, refscores, scale="linear", smooth=1)
+wordscore <- predict(ws, rescaling="lbg")
+
+#Writing the results into data frame
+wordscores.2014 <- data.frame(cbind(docvars(ungdc.2014),
+                                       wordscore@textscores$textscore_lbg))
+
+wordscores.2014 <- dplyr::rename(wordscores.2014, wscore = wordscore.textscores.textscore_lbg)
+```
+
+
+##Map with 2014 wordscore results
+
+```{r}
+sPDF <- joinCountryData2Map(wordscores.2014,
+                            joinCode="ISO3",nameJoinColumn="Country")
+
+#Setting up class intervals for continuous variable
+classInt <- classIntervals(sPDF$wscore,
+                           style="kmeans")
+
+catMethod=classInt$brks
+
+#Selecting diverging palette
+colourPalette <- brewer.pal(9,"Blues")
+#colourPalette <- brewer.pal(9,"PuOr")
+
+#Drawing the map
+
+mapParams <- mapCountryData(sPDF,nameColumnToPlot="wscore", 
+                            #catMethod="pretty", 
+                            catMethod=catMethod,
+                            mapTitle="USA vs Russia: Wordscore 2014",
+                            colourPalette=colourPalette,
+                            #oceanCol="lightblue",
+                            missingCountryCol="grey", 
+                            addLegend="FALSE"
+                            #borderCol="black"
+)
+
+#adding legend
+do.call( addMapLegend, c( mapParams, legendLabels="limits", 
+                          labelFontSize=0.7,legendShrink=0.7,
+                          legendMar=4, legendWidth=0.6))
+
+
+```
+
+## Correspondence Analysis
+
+```{r}
+#Note: takes about 2h on full corpus, on MacBook Pro (3 GHz, 16GB RAM)
+system.time(ca <- cca(dfm.trim))
+ca
+```
+
+
+```{r}
+#Extracting CA scores on first 10 dimensions
+scores <- as.data.frame(scores(ca,choices=c(1:10), display="wa", scaling=1))
+
+#Adding docvars
+ca.scores <- data.frame(cbind(docvars(ungd_corpus), scores))
+
+```
+
+
+
+##CA plots
+
+
+```{r}
+#Dimension 1
+ggplot(data=subset(ca.scores,Country=="USA" | Country=="RUS"), 
+            aes(x=Year, y=CA1, group=Country, colour=Country)) +
+  theme_bw() +
+  ggtitle("USA and Russia") + ylab("CA Dimension 1")+
+  theme(plot.title = element_text(lineheight=.8, face="bold", size=15),
+        axis.title.x = element_text(face="bold", size=11),
+        axis.title.y = element_text(face="bold", size=11),
+        axis.text.x  = element_text(angle=90, vjust=0.5, size=8)) +
+  scale_y_continuous() +
+  scale_x_continuous(breaks = seq(1970,2014,2)) +
+  geom_smooth(se = FALSE) + 
+  geom_point(aes(shape=Country))
+  
+
+#ggsave("RusUSA-CA1.pdf")
+
+
+```
+
+
+
+
+```{r}
+#Dimension 1
+ggplot(data=subset(ca.scores,Country=="USA" | Country=="GBR"), 
+            aes(x=Year, y=CA1, group=Country, colour=Country)) +
+  theme_bw() +
+  ggtitle("USA and UK") + ylab("CA Dimension 1")+
+  theme(plot.title = element_text(lineheight=.8, face="bold", size=15),
+        axis.title.x = element_text(face="bold", size=11),
+        axis.title.y = element_text(face="bold", size=11),
+        axis.text.x  = element_text(angle=90, vjust=0.5, size=8)) +
+  scale_y_continuous() +
+  scale_x_continuous(breaks = seq(1970,2014,2)) +
+  geom_smooth(se = FALSE) + 
+  geom_point(aes(shape=Country))
+  
+
+#ggsave("GBRUSA-CA1.pdf")
+
+
+```
+
+
+
+
+```{r}
+#Dimension 2
+ggplot(data=subset(ca.scores,Country=="USA" | Country=="RUS"), 
+            aes(x=Year, y=CA2, group=Country, colour=Country)) +
+  theme_bw() +
+  ggtitle("USA and Russia") + ylab("CA Dimension 2")+
+  theme(plot.title = element_text(lineheight=.8, face="bold", size=15),
+        axis.title.x = element_text(face="bold", size=11),
+        axis.title.y = element_text(face="bold", size=11),
+        axis.text.x  = element_text(angle=90, vjust=0.5, size=8)) +
+  scale_y_continuous() +
+  scale_x_continuous(breaks = seq(1970,2014,2)) +
+  geom_smooth(se = FALSE) + 
+  geom_point(aes(shape=Country))
+  
+
+#ggsave("RusUSA-CA2.pdf")
+
+
+```
+
+
+
+
+
+```{r}
+#Dimension 2
+ggplot(data=subset(ca.scores,Country=="USA" | Country=="GBR"), 
+            aes(x=Year, y=CA2, group=Country, colour=Country)) +
+  theme_bw() +
+  ggtitle("USA and UK") + ylab("CA Dimension 2")+
+  theme(plot.title = element_text(lineheight=.8, face="bold", size=15),
+        axis.title.x = element_text(face="bold", size=11),
+        axis.title.y = element_text(face="bold", size=11),
+        axis.text.x  = element_text(angle=90, vjust=0.5, size=8)) +
+  scale_y_continuous() +
+  scale_x_continuous(breaks = seq(1970,2014,2)) +
+  geom_smooth(se = FALSE) + 
+  geom_point(aes(shape=Country))
+  
+
+#ggsave("GBRUSA-CA2.pdf")
+
+
+```
+
+
+
+##Empirical example: Extending a model in Kelley (2007)
+
+
+```{r}
+#Replication Stata file provided by Judith Kelley
+replication <- read_dta("Replication.dta")
+
+replication <- rename(replication, Country=abbrev) 
+
+#merging replication file with CA estimates
+combined.data <- merge(replication, subset(ca.scores,Year==2002), by="Country")
+dim(combined.data)
+
+#Keeping only complete data for subsequent estimations. CV.GLM requires complete cases.
+combined.data <- na.omit(combined.data)
+#67 observations dropped
+dim(combined.data)
+
+```
+
+
+
+###Estimating a logit model
+```{r}
+#Original model
+glm.fit <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                 cut + IraqSupport + dummyRatif + RuleOfLaw, 
+               data=combined.data,
+               family = binomial)
+
+summary(glm.fit)
+
+```
+
+
+###Using cross-validation to calculate the number of dimensions to include
+
+Given that each CA dimension is orthogonal to each other, we simply add dimensions sequentially. This is driven by theoretical logic whether one, two, or $k$ CA dimensions should be used in the GLM model above. We search up to ten CA dimensions. And implement a version of leave-one-out cross-validation. This is a very simple search through specifications for illustrative purposes only.
+
+
+
+```{r}
+
+set.seed(2)
+
+
+cv.error <- rep(0,10)
+
+glm.fit.1 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.1)
+
+cv.error[1] <- cv.glm(combined.data, glm.fit.1)$delta[1]
+
+#####
+glm.fit.2 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.2)
+
+cv.error[2] <- cv.glm(combined.data, glm.fit.2)$delta[1]
+
+######
+
+glm.fit.3 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.3)
+
+cv.error[3] <- cv.glm(combined.data, glm.fit.3)$delta[1]
+
+######
+
+glm.fit.4 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3 + CA4, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.4)
+
+cv.error[4] <- cv.glm(combined.data, glm.fit.4)$delta[1]
+
+
+######
+
+glm.fit.5 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3 + CA4 + CA5, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.5)
+
+cv.error[5] <- cv.glm(combined.data, glm.fit.5)$delta[1]
+
+######
+
+glm.fit.6 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3 + CA4 + CA5 + CA6, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.6)
+
+cv.error[6] <- cv.glm(combined.data, glm.fit.6)$delta[1]
+
+
+######
+
+glm.fit.7 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3 + CA4 + CA5 + CA6 + CA7, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.7)
+
+cv.error[7] <- cv.glm(combined.data, glm.fit.7)$delta[1]
+
+######
+
+glm.fit.8 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3 + CA4 + CA5 + CA6 + CA7 + CA8, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.8)
+
+cv.error[8] <- cv.glm(combined.data, glm.fit.8)$delta[1]
+
+######
+
+glm.fit.9 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                   cut + IraqSupport + dummyRatif + RuleOfLaw +
+                   CA1 + CA2 + CA3 + CA4 + CA5 + CA6 + CA7 + CA8 + CA9, 
+                 data=combined.data,
+                 family = binomial)
+
+summary(glm.fit.9)
+
+cv.error[9] <- cv.glm(combined.data, glm.fit.9)$delta[1]
+
+######
+
+glm.fit.10 <- glm(coop ~ polityDEM + LikeMinded + Physint + lngdp2004 + gsp + 
+                    cut + IraqSupport + dummyRatif + RuleOfLaw +
+                    CA1 + CA2 + CA3 + CA4 + CA5 + CA6 + CA7 + CA8 + CA9 + CA10, 
+                  data=combined.data,
+                  family = binomial)
+
+summary(glm.fit.10)
+
+cv.error[10] <- cv.glm(combined.data, glm.fit.10)$delta[1]
+
+cv.error
+
+
+error <- as.data.frame(cv.error)
+
+```
+
+###Plotting cross-validation error
+
+We are selecting the number of CA dimensions based on the lowest CV error. Here it is the model with three first CA dimensions.
+
+```{r}
+ggplot(data=error, aes(x=row(error), y=cv.error)) +
+  geom_point(color='blue', size=1) +
+  theme_bw() +
+ scale_x_continuous(breaks=seq(0,10,1), name = "Number of dimensions") +
+  ylab("CV error") +
+  ggtitle("LOOCV results")
+
+#ggsave("cv.pdf")
+
+```
+
+
+
+###Graph of results
+
+Plotting the results of GLM model with three CA dimensions included in the model.
+
+```{r}
+
+plotreg(glm.fit.3, custom.note = "",
+                custom.coef.names = c("intercept", "Polity", "Allies", "HR", 
+                           "GDP", "GSP status", "Military aid", "Iraq war", 
+                           "ICC ratification", "Rule of law", "CA1", "CA2", "CA3"),
+                custom.model.names = "Bilateral nonsurrender agreements with US")
+
+```
+
+
+###Insights into CA3
+
+We use `goodness` function from package `vegan` to extract the terms that account for most of variation (inertia) on a dimension (axis). 
+
+```{r}
+ca3 <- as.data.frame(goodness(ca, model =  "CA", choices=3))
+
+ca3$words <- rownames(ca3)
+
+```
+
+
+We can visualize the top loading words using a simple wordcloud.
+
+```{r}
+wordcloud::wordcloud(ca3$words,ca3$CA3,
+                     max.words = 100,
+                     random.order = FALSE,
+                     rot.per = .3,
+                     scale = c(3, .1), 
+                     colors = brewer.pal(6, "Blues"))
+
+```
+
+
+##Session Information
+For replication purposes, we're providing session information.
+```{r}
+sessionInfo()
+```
+
