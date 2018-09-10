@@ -27,4 +27,4 @@ A browsing and visualization tool that allows users to explore individual docume
 
 When using the data, please cite: 
 * Alexander Baturo, Niheer Dasandi, and Slava Jankin Mikhaylov, ["Understanding State Preferences With Text As Data: Introducing the UN General Debate Corpus"](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821) _Research and Politics_, 2017, Volume 4, Issue 2.
-* [Replication set for _RAP_ article](https://doi.org/10.7910/DVN/AER5QJ)
+* Replication set for [_RAP_ article](https://doi.org/10.7910/DVN/AER5QJ)
