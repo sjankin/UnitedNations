@@ -10,7 +10,7 @@ This new dataset, the UN General Debate Corpus (UNGDC), introduces the corpus of
 
 ## Data
 
-The most up-to-date version of the United Nations General Debate Corpus data is available to download from [Dataverse](https://doi.org/10.7910/DVN/0TJX8Y) or directly from [GitHub here](files/UNGDC_1970-2018.zip).
+The most up-to-date version of the United Nations General Debate Corpus data is available to download from [Dataverse](https://doi.org/10.7910/DVN/0TJX8Y) or directly from [GitHub here](files/UNGDC 1970-2018.zip).
 
 ## Visualization
 
