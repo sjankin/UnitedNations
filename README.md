@@ -6,15 +6,15 @@ These statements are akin to the annual legislative state-of-the-union addresses
 
 The General Debate provides a unique and invaluable source of information on the preferences of states on the widest range of policy issues. Issues of strategic importance for the world.
 
-This new dataset, the UN General Debate Corpus (UNGDC), introduces the corpus of texts of General Debate statements from 1970 (Session 25) to 2017 (Session 72). For a full description of the UNGDC, please see the [accompanying paper](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821).
+This new dataset, the UN General Debate Corpus (UNGDC), introduces the corpus of texts of General Debate statements from 1970 (Session 25) to 2018 (Session 73). For a full description of the UNGDC, please see the [accompanying paper](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821).
 
 ## Data
 
-The most up-to-date version of the United Nations General Debate Corpus data is available to download from [Dataverse](https://doi.org/10.7910/DVN/0TJX8Y) or directly from [GitHub here](files/UNGDC_1970-2017.zip).
+The most up-to-date version of the United Nations General Debate Corpus data is available to download from [Dataverse](https://doi.org/10.7910/DVN/0TJX8Y) or directly from [GitHub here](files/UNGDC_1970-2018.zip).
 
 ## Visualization
 
-A browsing and visualization tool that allows users to explore individual documents and the topics covered, including the top words that characterise topics, the evolution of topics over time, word distributions across topics, the underlying digitised texts of speeches, and the source PDFs is [available here](http://ungd.smikhaylov.net).
+A browsing and visualisation tool that allows users to explore individual documents and the topics covered, including the top words that characterise topics, the evolution of topics over time, word distributions across topics, the underlying digitised texts of speeches, and the source PDFs is [available here](http://ungd.smikhaylov.net).
 
 
 ## Examples of analysis
