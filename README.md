@@ -21,6 +21,7 @@ A browsing and visualisation tool that allows users to explore individual docume
 
 * [Wordscore and visualisations example](files/UNGD_analysis_example.nb.html)
 * [Dictionary and keyword analysis for _The Lancet_ report](https://github.com/sjankin/lancet)
+* Medium article by Luke Lefebure [Exploring the UN General Debates with Dynamic Topic Models](https://towardsdatascience.com/exploring-the-un-general-debates-with-dynamic-topic-models-72dc0e307696) and corresponding [GitHub repo](https://github.com/llefebure/un-general-debates)
 
 
 ## Citation
