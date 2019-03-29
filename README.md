@@ -6,7 +6,7 @@ These statements are akin to the annual legislative state-of-the-union addresses
 
 The General Debate provides a unique and invaluable source of information on the preferences of states on the widest range of policy issues. Issues of strategic importance for the world.
 
-This new dataset, the UN General Debate Corpus (UNGDC), introduces the corpus of texts of General Debate statements from 1970 (Session 25) to 2018 (Session 73). For a full description of the UNGDC, please see the [accompanying paper](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821).
+This new dataset, the UN General Debate Corpus (UNGDC), introduces the corpus of 8,093 texts of General Debate statements from 1970 (Session 25) to 2018 (Session 73). For a full description of the UNGDC, please see the [accompanying paper](http://journals.sagepub.com/doi/abs/10.1177/2053168017712821).
 
 ## Data
 
